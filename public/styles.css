@@ -1,0 +1,110 @@
+:root{
+  --sky:#2BA8E0; --sky-deep:#1E7FB5; --orange:#F7941E; --orange-deep:#F0820C;
+  --yellow:#FFC627; --ink:#22303A; --muted:#7A8A95; --cream:#FBF7EF;
+  --card:#FFFFFF; --line:#E8EEF2; --bg:#F2F7FA;
+  --green:#2BB673; --red:#E0573B;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Sarabun',sans-serif;color:var(--ink);background:var(--bg)}
+.hidden{display:none!important}
+a{color:var(--sky-deep)}
+
+/* ---------- ปุ่ม ---------- */
+.btn{cursor:pointer;border:none;font-family:'Mitr',sans-serif;font-weight:500;font-size:15px;
+  padding:11px 18px;border-radius:12px;transition:transform .1s,box-shadow .12s,background .12s}
+.btn:active{transform:translateY(1px)}
+.btn-primary{color:#fff;background:linear-gradient(135deg,var(--orange),var(--orange-deep));
+  box-shadow:0 8px 18px -8px rgba(247,148,30,.7);width:100%;padding:14px;font-size:16px}
+.btn-primary:hover{box-shadow:0 12px 22px -8px rgba(247,148,30,.8)}
+.btn-sky{color:#fff;background:var(--sky)}.btn-sky:hover{background:var(--sky-deep)}
+.btn-green{color:#fff;background:var(--green)}
+.btn-red{color:#fff;background:var(--red)}
+.btn-sm{padding:7px 13px;font-size:13.5px;border-radius:10px}
+.btn-ghost{cursor:pointer;background:transparent;border:1.5px solid var(--line);color:var(--muted);
+  font-family:'Sarabun';font-weight:600;font-size:13px;padding:7px 13px;border-radius:10px}
+.btn-ghost:hover{border-color:var(--sky);color:var(--sky-deep)}
+
+/* ---------- หน้า login ---------- */
+.login-wrap{min-height:100vh;display:grid;place-items:center;padding:24px;overflow:hidden;
+  background:radial-gradient(circle at 15% 12%,rgba(43,168,224,.16),transparent 42%),
+    radial-gradient(circle at 88% 85%,rgba(247,148,30,.14),transparent 45%),
+    linear-gradient(160deg,#EAF6FD 0%,var(--cream) 60%)}
+.star{position:fixed;color:var(--yellow);font-size:30px;opacity:.5;animation:float 7s ease-in-out infinite}
+.s1{top:14%;left:10%}.s2{top:24%;right:12%;color:var(--sky);font-size:22px;animation-delay:1.2s}
+.s3{bottom:18%;left:16%;color:var(--orange);font-size:26px;animation-delay:2.1s}.s4{bottom:26%;right:18%;font-size:20px;animation-delay:.6s}
+@keyframes float{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-14px) rotate(8deg)}}
+.login-card{width:min(420px,100%);background:var(--card);border-radius:28px;padding:14px 34px 30px;position:relative;z-index:2;
+  box-shadow:0 24px 60px -24px rgba(30,127,181,.35);animation:rise .6s cubic-bezier(.2,.8,.2,1) both}
+@keyframes rise{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
+.logo{display:block;width:74%;max-width:280px;margin:0 auto -6px;filter:drop-shadow(0 8px 16px rgba(30,127,181,.18))}
+.login-sub{text-align:center;font-family:'Mitr';font-weight:500;font-size:15px;color:var(--sky-deep);margin-bottom:4px}
+.login-sub small{display:block;font-family:'Sarabun';font-weight:400;color:var(--muted);font-size:12.5px;margin-top:2px}
+#loginForm{margin-top:20px;display:flex;flex-direction:column;gap:14px}
+.field-group label{font-weight:600;font-size:13.5px;display:block;margin-bottom:6px}
+input,select,textarea{width:100%;font-family:'Sarabun';font-size:15px;color:var(--ink);
+  padding:12px 14px;border:1.5px solid var(--line);border-radius:12px;background:#FCFDFE;transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--sky);box-shadow:0 0 0 4px rgba(43,168,224,.14)}
+.login-err{color:var(--red);font-size:13px;text-align:center;min-height:18px;font-weight:600}
+.login-hint{margin-top:14px;padding:10px 12px;border-radius:12px;background:rgba(43,168,224,.07);
+  font-size:12.5px;color:var(--sky-deep);line-height:1.5;text-align:center}
+.login-foot{text-align:center;margin-top:16px;font-size:11.5px;color:var(--muted)}
+
+/* ---------- แอปหลัก ---------- */
+.topbar{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+  background:#fff;border-bottom:1px solid var(--line);padding:10px 22px;box-shadow:0 2px 10px -6px rgba(0,0,0,.1)}
+.brand{display:flex;align-items:center;gap:10px;font-family:'Mitr';font-weight:600;color:var(--sky-deep);font-size:17px}
+.brand img{width:38px;height:38px;object-fit:contain}
+.brand em{font-style:normal;color:var(--orange);font-size:13px;vertical-align:super}
+#nav{display:flex;gap:4px;flex-wrap:wrap;flex:1}
+.nav-item{cursor:pointer;font-family:'Mitr';font-weight:500;font-size:14px;color:var(--muted);
+  padding:8px 14px;border-radius:10px;transition:.12s}
+.nav-item:hover{background:var(--bg);color:var(--ink)}
+.nav-item.active{background:rgba(43,168,224,.12);color:var(--sky-deep)}
+.who{display:flex;align-items:center;gap:10px;font-size:13.5px}
+#whoName{font-weight:600}
+.role-badge{font-family:'Mitr';font-size:11px;font-weight:500;color:#fff;background:var(--sky);padding:3px 9px;border-radius:20px}
+#content{max-width:1080px;margin:24px auto;padding:0 22px}
+
+/* ---------- การ์ด / ตาราง ---------- */
+.panel{background:#fff;border:1px solid var(--line);border-radius:18px;padding:22px;margin-bottom:20px}
+.panel h2{font-family:'Mitr';font-weight:600;font-size:19px;color:var(--ink);margin-bottom:4px}
+.panel .desc{color:var(--muted);font-size:13.5px;margin-bottom:16px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+.row > div{flex:1;min-width:140px}
+.lbl{font-weight:600;font-size:13px;margin-bottom:6px;display:block}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line)}
+th{font-family:'Mitr';font-weight:500;color:var(--muted);font-size:12.5px;background:#FAFCFD}
+tr:hover td{background:#FAFDFF}
+.pill{display:inline-block;font-size:12px;font-weight:600;padding:2px 9px;border-radius:20px}
+.pill-cell{background:rgba(43,168,224,.12);color:var(--sky-deep);margin:1px}
+.pill-green{background:rgba(43,182,115,.14);color:#1d8a55}
+.pill-amber{background:rgba(255,198,39,.22);color:#9a7400}
+.pill-red{background:rgba(224,87,59,.14);color:#b53d24}
+.muted{color:var(--muted)}
+.right{text-align:right}
+.empty{text-align:center;color:var(--muted);padding:40px 0;font-size:14px}
+.tag-type{font-family:'Mitr';font-weight:500;font-size:12px;padding:3px 10px;border-radius:8px}
+.t-import{background:rgba(43,182,115,.14);color:#1d8a55}
+.t-withdraw{background:rgba(224,87,59,.14);color:#b53d24}
+.t-move{background:rgba(43,168,224,.14);color:var(--sky-deep)}
+.t-initial{background:rgba(255,198,39,.22);color:#9a7400}
+
+/* modal */
+.modal-bg{position:fixed;inset:0;background:rgba(34,48,58,.45);display:grid;place-items:center;z-index:50;padding:20px}
+.modal{background:#fff;border-radius:20px;padding:26px;width:min(440px,100%);box-shadow:0 30px 70px -20px rgba(0,0,0,.4)}
+.modal h3{font-family:'Mitr';font-weight:600;font-size:18px;margin-bottom:14px}
+.modal .actions{display:flex;gap:10px;margin-top:18px}
+.modal .actions .btn{flex:1}
+.err{color:var(--red);font-size:13px;font-weight:600;margin-top:8px;min-height:16px}
+
+/* toast */
+.toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:var(--ink);color:#fff;padding:12px 22px;border-radius:12px;font-size:14px;font-weight:600;
+  opacity:0;pointer-events:none;transition:.25s;z-index:99}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.ok{background:var(--green)}.toast.bad{background:var(--red)}
+
+@media(max-width:640px){
+  .topbar{padding:10px 14px}#content{padding:0 14px}.who #whoName{display:none}
+}

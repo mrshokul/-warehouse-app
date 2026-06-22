@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ฟ้าตระการมอลล์ — ระบบบริหารสินค้าในโกดัง</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ===== หน้าเข้าสู่ระบบ ===== -->
+<section id="loginView" class="login-wrap">
+  <div class="star s1">★</div><div class="star s2">★</div>
+  <div class="star s3">★</div><div class="star s4">★</div>
+  <main class="login-card">
+    <img class="logo" src="logo.png" alt="ฟ้าตระการมอลล์">
+    <p class="login-sub">ระบบบริหารสินค้าในโกดัง<small>ลงชื่อเข้าใช้เพื่อจัดการสต็อก</small></p>
+    <form id="loginForm">
+      <div class="field-group">
+        <label for="li-user">ชื่อผู้ใช้</label>
+        <input id="li-user" type="text" placeholder="กรอกชื่อผู้ใช้" autocomplete="username">
+      </div>
+      <div class="field-group">
+        <label for="li-pass">รหัสผ่าน</label>
+        <input id="li-pass" type="password" placeholder="กรอกรหัสผ่าน" autocomplete="current-password">
+      </div>
+      <button class="btn btn-primary" type="submit">เข้าสู่ระบบ</button>
+      <p class="login-err" id="loginErr"></p>
+    </form>
+    <div class="login-hint">เข้าใช้ได้เฉพาะผู้ที่เจ้าของร้านหรือผู้ดูแลระบบอนุญาตเท่านั้น</div>
+    <p class="login-foot">ห.จ.ก. ฟ้าตระการมอลล์ · ระบบภายในสำหรับพนักงาน</p>
+  </main>
+</section>
+
+<!-- ===== แอปหลัก ===== -->
+<div id="appView" class="app hidden">
+  <header class="topbar">
+    <div class="brand"><img src="logo.png" alt="logo"><span>ฟ้าตระการมอลล์ <em>WMS</em></span></div>
+    <nav id="nav"></nav>
+    <div class="who">
+      <span id="whoName"></span><span class="role-badge" id="whoRole"></span>
+      <button class="btn-ghost" id="logoutBtn">ออกจากระบบ</button>
+    </div>
+  </header>
+  <main id="content"></main>
+</div>
+
+<div id="toast" class="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>
