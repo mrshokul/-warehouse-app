@@ -30,7 +30,36 @@
       <button class="btn btn-primary" type="submit">เข้าสู่ระบบ</button>
       <p class="login-err" id="loginErr"></p>
     </form>
+    <button class="btn-ghost login-switch" id="showRegister" type="button">ยังไม่มีบัญชี? สมัครเข้าใช้งาน</button>
     <div class="login-hint">เข้าใช้ได้เฉพาะผู้ที่เจ้าของร้านหรือผู้ดูแลระบบอนุญาตเท่านั้น</div>
+    <p class="login-foot">ห.จ.ก. ฟ้าตระการมอลล์ · ระบบภายในสำหรับพนักงาน</p>
+  </main>
+</section>
+
+<!-- ===== หน้าสมัครสมาชิก ===== -->
+<section id="registerView" class="login-wrap hidden">
+  <div class="star s1">★</div><div class="star s2">★</div>
+  <div class="star s3">★</div><div class="star s4">★</div>
+  <main class="login-card">
+    <img class="logo" src="logo.png" alt="ฟ้าตระการมอลล์">
+    <p class="login-sub">สมัครเข้าใช้งานระบบ<small>รอเจ้าของร้าน/ผู้ดูแลระบบอนุมัติก่อนเข้าใช้ได้</small></p>
+    <form id="registerForm">
+      <div class="field-group">
+        <label for="rg-name">ชื่อ-นามสกุล</label>
+        <input id="rg-name" type="text" placeholder="ชื่อจริงของคุณ" autocomplete="name">
+      </div>
+      <div class="field-group">
+        <label for="rg-user">ชื่อผู้ใช้ (สำหรับล็อกอิน)</label>
+        <input id="rg-user" type="text" placeholder="ตั้งชื่อผู้ใช้" autocomplete="username">
+      </div>
+      <div class="field-group">
+        <label for="rg-pass">รหัสผ่าน</label>
+        <input id="rg-pass" type="password" placeholder="อย่างน้อย 4 ตัวอักษร" autocomplete="new-password">
+      </div>
+      <button class="btn btn-primary" type="submit">ส่งคำขอสมัคร</button>
+      <p class="login-err" id="registerErr"></p>
+    </form>
+    <button class="btn-ghost login-switch" id="showLogin" type="button">มีบัญชีแล้ว? เข้าสู่ระบบ</button>
     <p class="login-foot">ห.จ.ก. ฟ้าตระการมอลล์ · ระบบภายในสำหรับพนักงาน</p>
   </main>
 </section>

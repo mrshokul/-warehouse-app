@@ -38,6 +38,25 @@ $('#logoutBtn').addEventListener('click', async () => {
   await api('/logout', { method: 'POST' }); location.reload();
 });
 
+// ---------- REGISTER (สมัครสมาชิก) ----------
+$('#showRegister').addEventListener('click', () => {
+  $('#loginView').classList.add('hidden'); $('#registerView').classList.remove('hidden');
+});
+$('#showLogin').addEventListener('click', () => {
+  $('#registerView').classList.add('hidden'); $('#loginView').classList.remove('hidden');
+});
+$('#registerForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('#registerErr').textContent = '';
+  try {
+    const r = await api('/register', { method: 'POST', body: {
+      full_name: $('#rg-name').value, username: $('#rg-user').value, password: $('#rg-pass').value } });
+    $('#registerForm').reset();
+    $('#showLogin').click();
+    toast(r.message || 'ส่งคำขอสมัครแล้ว รออนุมัติ');
+  } catch (err) { $('#registerErr').textContent = err.message; }
+});
+
 async function boot() {
   CELLS = await api('/cells');
   $('#loginView').classList.add('hidden');
@@ -85,14 +104,14 @@ async function viewDashboard() {
     const rows = await api('/stock?q=' + encodeURIComponent(q));
     const body = $('#stockBody');
     if (!rows.length) { body.innerHTML = `<div class="empty">ยังไม่มีสต็อก — เริ่มจากการนับสต็อกตั้งต้นในเมนู "สร้างรายการ"</div>`; return; }
-    body.innerHTML = `<table><thead><tr><th>สินค้า</th><th>รหัส</th><th>ตำแหน่ง (ช่อง × จำนวน)</th><th class="right">รวม</th></tr></thead><tbody>
+    body.innerHTML = `<div class="table-wrap"><table><thead><tr><th>สินค้า</th><th>รหัส</th><th>ตำแหน่ง (ช่อง × จำนวน)</th><th class="right">รวม</th></tr></thead><tbody>
       ${rows.map(r => `<tr>
         <td>${esc(r.name)}</td>
         <td class="muted">${esc(r.code)}</td>
         <td>${r.cells.map(x => `<span class="pill pill-cell">${esc(x.cell)} · ${x.qty}</span>`).join(' ')}</td>
         <td class="right"><b>${r.total}</b> ${esc(r.unit || '')}</td>
       </tr>`).join('')}
-    </tbody></table>`;
+    </tbody></table></div>`;
   };
   $('#stockQ').addEventListener('input', debounce(load, 250));
   load();
@@ -201,7 +220,7 @@ async function viewPending() {
   </div>`;
 
   const pb = $('#pendBody');
-  pb.innerHTML = mv.length ? `<table><thead><tr><th>ประเภท</th><th>สินค้า</th><th>จำนวน</th><th>ช่อง</th><th>คนสร้าง</th><th>เวลา</th><th></th></tr></thead><tbody>
+  pb.innerHTML = mv.length ? `<div class="table-wrap"><table><thead><tr><th>ประเภท</th><th>สินค้า</th><th>จำนวน</th><th>ช่อง</th><th>คนสร้าง</th><th>เวลา</th><th></th></tr></thead><tbody>
     ${mv.map(m => {
       const mine = m.created_by === ME.id;
       const place = m.type === 'move' ? `${esc(m.from_cell)}→${esc(m.to_cell)}` : esc(m.to_cell || m.from_cell);
@@ -217,7 +236,7 @@ async function viewPending() {
                  : `<button class="btn btn-green btn-sm" data-confirm="${m.id}">ยืนยัน</button>`}
           <button class="btn-ghost btn-sm" data-cancel="${m.id}">ยกเลิก</button>
         </td></tr>`;
-    }).join('')}</tbody></table>` : `<div class="empty">ไม่มีรายการรออนุมัติ</div>`;
+    }).join('')}</tbody></table></div>` : `<div class="empty">ไม่มีรายการรออนุมัติ</div>`;
 
   pb.querySelectorAll('[data-confirm]').forEach(b => b.onclick = async () => {
     try { await api(`/movements/${b.dataset.confirm}/confirm`, { method: 'POST' }); toast('ยืนยันแล้ว'); viewPending(); }
@@ -229,7 +248,7 @@ async function viewPending() {
   }));
 
   const eb = $('#editBody');
-  eb.innerHTML = edits.length ? `<table><thead><tr><th>สินค้า</th><th>แก้จำนวน</th><th>ผู้ขอแก้</th><th>เวลา</th><th></th></tr></thead><tbody>
+  eb.innerHTML = edits.length ? `<div class="table-wrap"><table><thead><tr><th>สินค้า</th><th>แก้จำนวน</th><th>ผู้ขอแก้</th><th>เวลา</th><th></th></tr></thead><tbody>
     ${edits.map(e => {
       const mine = e.requested_by === ME.id;
       return `<tr><td>${esc(e.product_name)} <span class="muted">(${esc(e.product_code)})</span></td>
@@ -237,7 +256,7 @@ async function viewPending() {
         <td>${esc(e.requester_name)}</td><td class="muted" style="font-size:12px">${esc(e.requested_at)}</td>
         <td class="right">${mine ? '<span class="muted" style="font-size:12px">รอคนอื่นยืนยัน</span>'
           : `<button class="btn btn-green btn-sm" data-econf="${e.id}">ยืนยันการแก้</button>`}</td></tr>`;
-    }).join('')}</tbody></table>` : `<div class="empty">ไม่มีคำขอแก้ไข</div>`;
+    }).join('')}</tbody></table></div>` : `<div class="empty">ไม่มีคำขอแก้ไข</div>`;
   eb.querySelectorAll('[data-econf]').forEach(b => b.onclick = async () => {
     try { await api(`/edits/${b.dataset.econf}/confirm`, { method: 'POST' }); toast('ยืนยันการแก้แล้ว'); viewPending(); }
     catch (e) { toast(e.message, 'bad'); }
@@ -268,7 +287,7 @@ async function viewReports() {
     if (pid) params.set('product_id', pid);
     if ($('#rpCell').value) params.set('cell', $('#rpCell').value);
     const rows = await api('/movements?' + params.toString());
-    $('#rpBody').innerHTML = rows.length ? `<table><thead><tr><th>เวลา</th><th>ประเภท</th><th>สินค้า</th><th>จำนวน</th><th>ช่อง</th><th>คนทำ</th><th>คนยืนยัน</th><th>สถานะ</th></tr></thead><tbody>
+    $('#rpBody').innerHTML = rows.length ? `<div class="table-wrap"><table><thead><tr><th>เวลา</th><th>ประเภท</th><th>สินค้า</th><th>จำนวน</th><th>ช่อง</th><th>คนทำ</th><th>คนยืนยัน</th><th>สถานะ</th></tr></thead><tbody>
       ${rows.map(m => `<tr>
         <td class="muted" style="font-size:12px">${esc(m.created_at)}</td>
         <td><span class="tag-type t-${m.type}">${TYPE_TH[m.type]}</span></td>
@@ -278,7 +297,7 @@ async function viewReports() {
         <td>${esc(m.creator_name)}</td>
         <td>${esc(m.confirmer_name || '—')}</td>
         <td>${statusPill(m)}${m.status === 'confirmed' && can('angel') ? ` <button class="btn-ghost btn-sm" data-edit="${m.id}" data-q="${m.qty}">แก้</button>` : ''}</td>
-      </tr>`).join('')}</tbody></table>` : `<div class="empty">ไม่พบรายการ</div>`;
+      </tr>`).join('')}</tbody></table></div>` : `<div class="empty">ไม่พบรายการ</div>`;
     $('#rpBody').querySelectorAll('[data-edit]').forEach(b => b.onclick = () => askEdit(b.dataset.edit, b.dataset.q, () => $('#rpGo').click()));
   };
 }
@@ -303,11 +322,11 @@ async function viewProducts() {
   const load = async () => {
     const { total, items } = await api('/products?q=' + encodeURIComponent($('#pQ').value.trim()));
     $('#pBody').innerHTML = `<p class="muted" style="font-size:13px;margin-bottom:8px">ทั้งหมด ${total.toLocaleString()} รายการ${items.length < total ? ' · แสดง ' + items.length : ''}</p>
-      <table><thead><tr><th>ชื่อสินค้า</th><th>รหัส</th><th>หน่วย</th><th></th></tr></thead><tbody>
+      <div class="table-wrap"><table><thead><tr><th>ชื่อสินค้า</th><th>รหัส</th><th>หน่วย</th><th></th></tr></thead><tbody>
       ${items.map(p => `<tr><td>${esc(p.name)}${p.is_custom ? ' <span class="pill pill-amber">รหัสกำหนดเอง</span>' : ''}</td>
         <td class="muted">${esc(p.code)}</td><td>${esc(p.unit || '—')}</td>
         <td class="right">${can('guardian') ? `<button class="btn-ghost btn-sm" data-del="${p.id}">ลบ</button>` : ''}</td></tr>`).join('')}
-      </tbody></table>`;
+      </tbody></table></div>`;
     $('#pBody').querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
       if (!confirm('ลบสินค้านี้?')) return;
       try { await api('/products/' + b.dataset.del, { method: 'DELETE' }); toast('ลบแล้ว'); load(); }
@@ -333,20 +352,45 @@ async function viewProducts() {
 async function viewAdmin() {
   const c = $('#content');
   const users = await api('/users');
+  const pending = users.filter(u => !u.approved);
+  const active = users.filter(u => u.approved);
   const RL = { intern: 'มนุษย์ฝึกหัด', angel: 'นางฟ้า', guardian: 'เทพพิทักษ์', god: 'เทพเจ้าสูงสุด' };
-  c.innerHTML = `<div class="panel">
+  const roleOpts = (sel) => Object.entries(RL).map(([k, v]) => `<option value="${k}"${k === sel ? ' selected' : ''}>${v}</option>`).join('');
+  c.innerHTML = `${pending.length ? `<div class="panel">
+    <h2>คำขอสมัครเข้าใช้งาน <span class="muted" style="font-size:14px">(${pending.length})</span></h2>
+    <p class="desc">ผู้สมัครใหม่ — เลือกบทบาทแล้วกดอนุมัติ หรือปฏิเสธคำขอ</p>
+    <div class="table-wrap"><table><thead><tr><th>ชื่อ-นามสกุล</th><th>ชื่อผู้ใช้</th><th>กำหนดบทบาท</th><th></th></tr></thead><tbody>
+    ${pending.map(u => `<tr><td>${esc(u.full_name)}</td><td class="muted">${esc(u.username)}</td>
+      <td><select data-role-for="${u.id}" style="width:auto">${roleOpts('intern')}</select></td>
+      <td class="right">
+        <button class="btn btn-green btn-sm" data-approve="${u.id}">อนุมัติ</button>
+        <button class="btn-ghost btn-sm" data-reject="${u.id}">ปฏิเสธ</button>
+      </td></tr>`).join('')}
+    </tbody></table></div>
+  </div>` : ''}
+  <div class="panel">
     <h2>จัดการผู้ใช้</h2>
     <p class="desc">เพิ่มพนักงาน กำหนดบทบาท และระงับบัญชีคนที่ลาออก</p>
     <div style="max-width:200px;margin-bottom:16px"><button class="btn btn-sky btn-sm" id="uAdd">+ เพิ่มผู้ใช้</button></div>
-    <table><thead><tr><th>ชื่อ-นามสกุล</th><th>ชื่อผู้ใช้</th><th>บทบาท</th><th>สถานะ</th><th></th></tr></thead><tbody>
-    ${users.map(u => `<tr><td>${esc(u.full_name)}</td><td class="muted">${esc(u.username)}</td>
+    <div class="table-wrap"><table><thead><tr><th>ชื่อ-นามสกุล</th><th>ชื่อผู้ใช้</th><th>บทบาท</th><th>สถานะ</th><th></th></tr></thead><tbody>
+    ${active.map(u => `<tr><td>${esc(u.full_name)}</td><td class="muted">${esc(u.username)}</td>
       <td><span class="pill pill-cell">${RL[u.role]}</span></td>
       <td>${u.active ? '<span class="pill pill-green">ใช้งาน</span>' : '<span class="pill pill-red">ระงับ</span>'}</td>
       <td class="right">${u.id !== ME.id ? `<button class="btn-ghost btn-sm" data-tog="${u.id}" data-a="${u.active}">${u.active ? 'ระงับ' : 'เปิดใช้'}</button>` : '<span class="muted" style="font-size:12px">(คุณ)</span>'}</td></tr>`).join('')}
-    </tbody></table></div>`;
+    </tbody></table></div></div>`;
   c.querySelectorAll('[data-tog]').forEach(b => b.onclick = async () => {
     await api('/users/' + b.dataset.tog, { method: 'PATCH', body: { active: b.dataset.a !== '1' } });
     toast('อัปเดตแล้ว'); viewAdmin();
+  });
+  c.querySelectorAll('[data-approve]').forEach(b => b.onclick = async () => {
+    const role = c.querySelector(`[data-role-for="${b.dataset.approve}"]`).value;
+    try { await api(`/users/${b.dataset.approve}/approve`, { method: 'POST', body: { role } }); toast('อนุมัติแล้ว'); viewAdmin(); }
+    catch (e) { toast(e.message, 'bad'); }
+  });
+  c.querySelectorAll('[data-reject]').forEach(b => b.onclick = async () => {
+    if (!confirm('ปฏิเสธคำขอสมัครนี้?')) return;
+    try { await api('/users/' + b.dataset.reject, { method: 'DELETE' }); toast('ปฏิเสธแล้ว'); viewAdmin(); }
+    catch (e) { toast(e.message, 'bad'); }
   });
   $('#uAdd').onclick = () => modal(`<h3>เพิ่มผู้ใช้ใหม่</h3>
     <label class="lbl">ชื่อ-นามสกุล</label><input id="nuName">

@@ -5,11 +5,23 @@ if (!process.env.DATABASE_URL) {
 
 const { Pool } = require('pg');
 
+// แยก parse เอง (ไม่ใช้ connectionString ตรงๆ) เพราะ username ของ Supabase pooler
+// มีจุด (เช่น postgres.xxxx) ซึ่งบางเวอร์ชันของ pg parse ผิดพลาดได้
+function parseConnString(url) {
+  const u = new URL(url);
+  return {
+    user: decodeURIComponent(u.username),
+    password: decodeURIComponent(u.password),
+    host: u.hostname,
+    port: +u.port || 5432,
+    database: u.pathname.replace(/^\//, '') || 'postgres',
+  };
+}
+
+const dbUrl = process.env.DATABASE_URL;
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL && process.env.DATABASE_URL.includes('localhost')
-    ? false
-    : { rejectUnauthorized: false },
+  ...(dbUrl ? parseConnString(dbUrl) : {}),
+  ssl: dbUrl && dbUrl.includes('localhost') ? false : { rejectUnauthorized: false },
 });
 
 async function all(text, params = []) {
@@ -58,8 +70,11 @@ async function init() {
     full_name     TEXT NOT NULL,
     role          TEXT NOT NULL CHECK(role IN ('intern','angel','guardian','god')),
     active        BOOLEAN NOT NULL DEFAULT true,
+    approved      BOOLEAN NOT NULL DEFAULT true,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
   );
+  -- เผื่อตารางถูกสร้างไว้ก่อนหน้า (ก่อนมีฟีเจอร์สมัครสมาชิก) — เพิ่มคอลัมน์ย้อนหลังแบบไม่กระทบผู้ใช้เดิม
+  ALTER TABLE users ADD COLUMN IF NOT EXISTS approved BOOLEAN NOT NULL DEFAULT true;
 
   -- session เข้าสู่ระบบ (เก็บใน DB เพื่อให้ใช้ได้บน serverless หลาย instance)
   CREATE TABLE IF NOT EXISTS sessions (

@@ -65,10 +65,26 @@ app.post('/api/login', h(async (req, res) => {
   const u = await db.get('SELECT * FROM users WHERE username=$1', [username || '']);
   if (!u || !auth.verifyPassword(password || '', u.password_hash))
     return res.status(401).json({ error: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' });
+  if (!u.approved) return res.status(403).json({ error: 'บัญชีนี้กำลังรอเจ้าของร้าน/ผู้ดูแลระบบอนุมัติ' });
   if (!u.active) return res.status(403).json({ error: 'บัญชีนี้ถูกระงับการใช้งาน' });
   const token = await auth.createSession(u.id);
   res.cookie('sid', token, { httpOnly: true, sameSite: 'lax' });
   res.json({ id: u.id, username: u.username, full_name: u.full_name, role: u.role, role_th: ROLE_TH[u.role] });
+}));
+
+// สมัครบัญชีใหม่ (เปิดสาธารณะ) — เข้าใช้งานไม่ได้จนกว่าเจ้าของร้าน/admin จะอนุมัติ
+app.post('/api/register', h(async (req, res) => {
+  const { username, password, full_name } = req.body;
+  if (!username || !password || !full_name)
+    return res.status(400).json({ error: 'กรุณากรอกข้อมูลให้ครบ' });
+  if (password.length < 4) return res.status(400).json({ error: 'รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร' });
+  if (await db.get('SELECT id FROM users WHERE username=$1', [username.trim()]))
+    return res.status(409).json({ error: 'ชื่อผู้ใช้นี้ถูกใช้แล้ว' });
+  await db.run(
+    `INSERT INTO users (username, password_hash, full_name, role, approved) VALUES ($1, $2, $3, 'intern', false)`,
+    [username.trim(), auth.hashPassword(password), full_name.trim()]
+  );
+  res.json({ ok: true, message: 'ส่งคำขอสมัครแล้ว รอเจ้าของร้าน/ผู้ดูแลระบบอนุมัติ' });
 }));
 
 app.post('/api/logout', h(async (req, res) => {
@@ -296,7 +312,26 @@ app.post('/api/edits/:id/confirm', requireAuth, requireRank('angel'), h(async (r
 
 // ===================== USERS (god) =====================
 app.get('/api/users', requireAuth, requireRank('god'), h(async (req, res) => {
-  res.json(await db.all('SELECT id, username, full_name, role, active FROM users ORDER BY role DESC, full_name'));
+  res.json(await db.all('SELECT id, username, full_name, role, active, approved FROM users ORDER BY approved ASC, role DESC, full_name'));
+}));
+// อนุมัติบัญชีที่สมัครเข้ามา — กำหนดบทบาทพร้อมกัน
+app.post('/api/users/:id/approve', requireAuth, requireRank('god'), h(async (req, res) => {
+  const id = +req.params.id;
+  const role = req.body.role;
+  if (!RANK.hasOwnProperty(role)) return res.status(400).json({ error: 'บทบาทไม่ถูกต้อง' });
+  const u = await db.get('SELECT id FROM users WHERE id=$1 AND approved=false', [id]);
+  if (!u) return res.status(404).json({ error: 'ไม่พบคำขอสมัครนี้ หรืออนุมัติไปแล้ว' });
+  await db.run('UPDATE users SET approved=true, role=$1 WHERE id=$2', [role, id]);
+  res.json({ ok: true });
+}));
+// ปฏิเสธ/ลบคำขอสมัครที่ยังไม่อนุมัติ
+app.delete('/api/users/:id', requireAuth, requireRank('god'), h(async (req, res) => {
+  const id = +req.params.id;
+  if (id === req.user.id) return res.status(400).json({ error: 'ลบบัญชีตัวเองไม่ได้' });
+  const u = await db.get('SELECT id FROM users WHERE id=$1 AND approved=false', [id]);
+  if (!u) return res.status(400).json({ error: 'ลบได้เฉพาะคำขอสมัครที่ยังไม่อนุมัติ — ใช้ "ระงับ" สำหรับบัญชีที่ใช้งานแล้ว' });
+  await db.run('DELETE FROM users WHERE id=$1', [id]);
+  res.json({ ok: true });
 }));
 app.post('/api/users', requireAuth, requireRank('god'), h(async (req, res) => {
   const { username, password, full_name, role } = req.body;
