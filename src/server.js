@@ -324,12 +324,19 @@ app.post('/api/users/:id/approve', requireAuth, requireRank('god'), h(async (req
   await db.run('UPDATE users SET approved=true, role=$1 WHERE id=$2', [role, id]);
   res.json({ ok: true });
 }));
-// ปฏิเสธ/ลบคำขอสมัครที่ยังไม่อนุมัติ
+// ลบบัญชี — ลบได้เฉพาะกรณีไม่มีประวัติการทำรายการผูกอยู่ (ป้องกันข้อมูลอ้างอิงขาด)
 app.delete('/api/users/:id', requireAuth, requireRank('god'), h(async (req, res) => {
   const id = +req.params.id;
   if (id === req.user.id) return res.status(400).json({ error: 'ลบบัญชีตัวเองไม่ได้' });
-  const u = await db.get('SELECT id FROM users WHERE id=$1 AND approved=false', [id]);
-  if (!u) return res.status(400).json({ error: 'ลบได้เฉพาะคำขอสมัครที่ยังไม่อนุมัติ — ใช้ "ระงับ" สำหรับบัญชีที่ใช้งานแล้ว' });
+  const exists = await db.get('SELECT id FROM users WHERE id=$1', [id]);
+  if (!exists) return res.status(404).json({ error: 'ไม่พบผู้ใช้นี้' });
+  const linked = await db.get(
+    `SELECT 1 AS x FROM movements WHERE created_by=$1 OR confirmed_by=$1 OR cancelled_by=$1
+     UNION SELECT 1 FROM edit_history WHERE requested_by=$1 OR confirmed_by=$1 LIMIT 1`,
+    [id]
+  );
+  if (linked) return res.status(400).json({ error: 'ลบไม่ได้: บัญชีนี้มีประวัติการทำรายการผูกอยู่ — ใช้ "ระงับ" แทน' });
+  await db.run('DELETE FROM sessions WHERE user_id=$1', [id]);
   await db.run('DELETE FROM users WHERE id=$1', [id]);
   res.json({ ok: true });
 }));
@@ -347,11 +354,24 @@ app.post('/api/users', requireAuth, requireRank('god'), h(async (req, res) => {
 }));
 app.patch('/api/users/:id', requireAuth, requireRank('god'), h(async (req, res) => {
   const id = +req.params.id;
-  if (id === req.user.id) return res.status(400).json({ error: 'ระงับบัญชีตัวเองไม่ได้' });
-  if (typeof req.body.active === 'boolean')
-    await db.run('UPDATE users SET active=$1 WHERE id=$2', [req.body.active, id]);
-  if (req.body.role && RANK.hasOwnProperty(req.body.role))
-    await db.run('UPDATE users SET role=$1 WHERE id=$2', [req.body.role, id]);
+  const { active, role, full_name, username, password } = req.body;
+  if (typeof active === 'boolean') {
+    if (id === req.user.id) return res.status(400).json({ error: 'ระงับบัญชีตัวเองไม่ได้' });
+    await db.run('UPDATE users SET active=$1 WHERE id=$2', [active, id]);
+  }
+  if (role && RANK.hasOwnProperty(role))
+    await db.run('UPDATE users SET role=$1 WHERE id=$2', [role, id]);
+  if (typeof full_name === 'string' && full_name.trim())
+    await db.run('UPDATE users SET full_name=$1 WHERE id=$2', [full_name.trim(), id]);
+  if (typeof username === 'string' && username.trim()) {
+    const dupe = await db.get('SELECT id FROM users WHERE username=$1 AND id<>$2', [username.trim(), id]);
+    if (dupe) return res.status(409).json({ error: 'ชื่อผู้ใช้นี้ถูกใช้แล้ว' });
+    await db.run('UPDATE users SET username=$1 WHERE id=$2', [username.trim(), id]);
+  }
+  if (typeof password === 'string' && password) {
+    if (password.length < 4) return res.status(400).json({ error: 'รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร' });
+    await db.run('UPDATE users SET password_hash=$1 WHERE id=$2', [auth.hashPassword(password), id]);
+  }
   res.json({ ok: true });
 }));
 

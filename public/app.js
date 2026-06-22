@@ -376,11 +376,44 @@ async function viewAdmin() {
     ${active.map(u => `<tr><td>${esc(u.full_name)}</td><td class="muted">${esc(u.username)}</td>
       <td><span class="pill pill-cell">${RL[u.role]}</span></td>
       <td>${u.active ? '<span class="pill pill-green">ใช้งาน</span>' : '<span class="pill pill-red">ระงับ</span>'}</td>
-      <td class="right">${u.id !== ME.id ? `<button class="btn-ghost btn-sm" data-tog="${u.id}" data-a="${u.active}">${u.active ? 'ระงับ' : 'เปิดใช้'}</button>` : '<span class="muted" style="font-size:12px">(คุณ)</span>'}</td></tr>`).join('')}
+      <td class="right">
+        <button class="btn-ghost btn-sm" data-edit="${u.id}">แก้ไข</button>
+        ${u.id !== ME.id ? `<button class="btn-ghost btn-sm" data-tog="${u.id}" data-a="${u.active}">${u.active ? 'ระงับ' : 'เปิดใช้'}</button>` : '<span class="muted" style="font-size:12px">(คุณ)</span>'}
+      </td></tr>`).join('')}
     </tbody></table></div></div>`;
   c.querySelectorAll('[data-tog]').forEach(b => b.onclick = async () => {
     await api('/users/' + b.dataset.tog, { method: 'PATCH', body: { active: b.dataset.a !== '1' } });
     toast('อัปเดตแล้ว'); viewAdmin();
+  });
+  c.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => {
+    const u = active.find(x => x.id == b.dataset.edit);
+    const isSelf = u.id === ME.id;
+    modal(`<h3>แก้ไขผู้ใช้</h3>
+      <label class="lbl">ชื่อ-นามสกุล</label><input id="euName" value="${esc(u.full_name)}">
+      <label class="lbl" style="margin-top:10px">ชื่อผู้ใช้ (สำหรับล็อกอิน)</label><input id="euUser" value="${esc(u.username)}">
+      <label class="lbl" style="margin-top:10px">ตั้งรหัสผ่านใหม่ (เว้นว่าง = ไม่เปลี่ยน)</label><input id="euPass" type="text" placeholder="ไม่เปลี่ยนรหัสผ่าน">
+      <label class="lbl" style="margin-top:10px">บทบาท</label>
+      <select id="euRole" ${isSelf ? 'disabled' : ''}>${Object.entries(RL).map(([k, v]) => `<option value="${k}"${k === u.role ? ' selected' : ''}>${v}</option>`).join('')}</select>
+      ${isSelf ? '<p class="muted" style="font-size:12px;margin-top:4px">เปลี่ยนบทบาทตัวเองไม่ได้</p>' : ''}
+      ${!isSelf ? `<button type="button" class="btn-ghost" id="euDel" style="margin-top:14px;width:100%;color:var(--red);border-color:var(--red)">ลบบัญชีนี้</button>` : ''}
+      <p class="err" id="euErr"></p>`, async () => {
+      try {
+        const body = { full_name: $('#euName').value, username: $('#euUser').value };
+        if (!isSelf) body.role = $('#euRole').value;
+        if ($('#euPass').value) body.password = $('#euPass').value;
+        await api('/users/' + u.id, { method: 'PATCH', body });
+        toast('บันทึกแล้ว'); viewAdmin(); return true;
+      } catch (e) { $('#euErr').textContent = e.message; return false; }
+    });
+    if (!isSelf) {
+      $('#euDel').onclick = async () => {
+        if (!confirm(`ลบบัญชี "${u.full_name}" ถาวร?`)) return;
+        try {
+          await api('/users/' + u.id, { method: 'DELETE' });
+          toast('ลบแล้ว'); document.querySelector('.modal-bg').remove(); viewAdmin();
+        } catch (e) { $('#euErr').textContent = e.message; }
+      };
+    }
   });
   c.querySelectorAll('[data-approve]').forEach(b => b.onclick = async () => {
     const role = c.querySelector(`[data-role-for="${b.dataset.approve}"]`).value;
