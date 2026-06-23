@@ -135,7 +135,10 @@ async function viewMovement() {
     </div>
     <div class="row" style="margin-top:12px">
       <div style="flex:2"><label class="lbl">สินค้า</label>
-        <input id="mvProdSearch" placeholder="พิมพ์รหัส/ชื่อ แล้วเลือก">
+        <div style="display:flex;gap:8px">
+          <input id="mvProdSearch" placeholder="พิมพ์รหัส/ชื่อ แล้วเลือก" style="flex:1">
+          <button type="button" class="btn btn-sky btn-sm" id="mvScanBtn" title="สแกนบาร์โค้ด">📷 สแกน</button>
+        </div>
         <div id="mvProdList"></div>
         <div id="mvProdChosen" class="muted" style="margin-top:6px"></div>
       </div>
@@ -172,7 +175,7 @@ async function viewMovement() {
   };
   $('#mvType').onchange = syncFields;
 
-  const searchProd = debounce(async () => {
+  const doSearchProd = async () => {
     const q = $('#mvProdSearch').value.trim();
     if (!q) { $('#mvProdList').innerHTML = ''; return; }
     const { items } = await api('/products?q=' + encodeURIComponent(q) + '&limit=8');
@@ -186,8 +189,23 @@ async function viewMovement() {
       $('#mvProdList').innerHTML = ''; $('#mvProdSearch').value = '';
       refreshFromHint();
     });
-  }, 250);
-  $('#mvProdSearch').addEventListener('input', searchProd);
+  };
+  $('#mvProdSearch').addEventListener('input', debounce(doSearchProd, 250));
+  $('#mvScanBtn').onclick = () => openScanner(async (code) => {
+    const { items } = await api('/products?q=' + encodeURIComponent(code) + '&limit=5');
+    const exact = items.find(p => p.code === code);
+    if (exact) {
+      chosen = exact;
+      $('#mvProdChosen').innerHTML = `เลือก: <b style="color:var(--ink)">${esc(chosen.name)}</b> (${esc(chosen.code)})`;
+      $('#mvProdList').innerHTML = ''; $('#mvProdSearch').value = '';
+      refreshFromHint();
+      toast('สแกนพบสินค้า: ' + chosen.name);
+    } else {
+      $('#mvProdSearch').value = code;
+      doSearchProd();
+      toast(items.length ? 'ไม่พบรหัสตรงทุกตัว — แสดงรายการใกล้เคียง' : 'ไม่พบสินค้ารหัสนี้ในระบบ', 'bad');
+    }
+  });
 
   $('#mvSubmit').onclick = async () => {
     $('#mvErr').textContent = '';
@@ -334,17 +352,24 @@ async function viewProducts() {
     });
   };
   $('#pQ').addEventListener('input', debounce(load, 250));
-  if (can('angel')) $('#pAdd').onclick = () => modal(`<h3>เพิ่มสินค้าใหม่</h3>
-    <label class="lbl">รหัส/บาร์โค้ด</label><input id="npCode" placeholder="สแกนบาร์โค้ด หรือกำหนดเอง">
-    <label class="lbl" style="margin-top:10px">ชื่อสินค้า</label><input id="npName">
-    <label class="lbl" style="margin-top:10px">หน่วยนับ</label><input id="npUnit" placeholder="กล่อง / แพ็ค / ด้าม">
-    <p class="err" id="npErr"></p>`, async () => {
-      try {
-        await api('/products', { method: 'POST', body: {
-          code: $('#npCode').value, name: $('#npName').value, unit: $('#npUnit').value, is_custom: true } });
-        toast('เพิ่มสินค้าแล้ว'); load(); return true;
-      } catch (e) { $('#npErr').textContent = e.message; return false; }
-    });
+  if (can('angel')) $('#pAdd').onclick = () => {
+    modal(`<h3>เพิ่มสินค้าใหม่</h3>
+      <label class="lbl">รหัส/บาร์โค้ด</label>
+      <div style="display:flex;gap:8px">
+        <input id="npCode" placeholder="สแกนบาร์โค้ด หรือกำหนดเอง" style="flex:1">
+        <button type="button" class="btn btn-sky btn-sm" id="npScanBtn" title="สแกนบาร์โค้ด">📷 สแกน</button>
+      </div>
+      <label class="lbl" style="margin-top:10px">ชื่อสินค้า</label><input id="npName">
+      <label class="lbl" style="margin-top:10px">หน่วยนับ</label><input id="npUnit" placeholder="กล่อง / แพ็ค / ด้าม">
+      <p class="err" id="npErr"></p>`, async () => {
+        try {
+          await api('/products', { method: 'POST', body: {
+            code: $('#npCode').value, name: $('#npName').value, unit: $('#npUnit').value, is_custom: true } });
+          toast('เพิ่มสินค้าแล้ว'); load(); return true;
+        } catch (e) { $('#npErr').textContent = e.message; return false; }
+      });
+    $('#npScanBtn').onclick = () => openScanner((code) => { $('#npCode').value = code; toast('สแกนสำเร็จ'); });
+  };
   load();
 }
 
@@ -472,6 +497,58 @@ function askEdit(id, oldQty, after) {
     });
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
+
+// ---------- สแกนบาร์โค้ดด้วยกล้อง ----------
+let _scannerLibPromise = null;
+function loadScannerLib() {
+  if (window.Html5Qrcode) return Promise.resolve();
+  if (_scannerLibPromise) return _scannerLibPromise;
+  _scannerLibPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
+    s.onload = () => resolve();
+    s.onerror = () => { _scannerLibPromise = null; reject(new Error('โหลดตัวสแกนไม่สำเร็จ ตรวจสอบอินเทอร์เน็ต')); };
+    document.head.appendChild(s);
+  });
+  return _scannerLibPromise;
+}
+async function openScanner(onResult) {
+  try { await loadScannerLib(); } catch (e) { toast(e.message, 'bad'); return; }
+  const bg = el(`<div class="modal-bg"><div class="modal scan-modal">
+    <h3>สแกนบาร์โค้ด</h3>
+    <div id="scanBox"></div>
+    <p class="muted" style="font-size:12.5px;margin-top:10px;text-align:center">เล็งกล้องไปที่บาร์โค้ดสินค้า</p>
+    <p class="err" id="scanErr" style="text-align:center"></p>
+    <div class="actions"><button class="btn-ghost" data-x style="flex:1">ปิด</button></div>
+  </div></div>`);
+  document.body.appendChild(bg);
+  let inst = new Html5Qrcode('scanBox');
+  let stopped = false;
+  const stop = async () => {
+    if (stopped) return; stopped = true;
+    try { await inst.stop(); } catch (_) {}
+    try { await inst.clear(); } catch (_) {}
+    bg.remove();
+  };
+  bg.querySelector('[data-x]').onclick = stop;
+  bg.onclick = (e) => { if (e.target === bg) stop(); };
+  const formats = window.Html5QrcodeSupportedFormats ? [
+    Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8,
+    Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.UPC_E,
+    Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.CODE_39,
+    Html5QrcodeSupportedFormats.ITF, Html5QrcodeSupportedFormats.QR_CODE,
+  ] : undefined;
+  try {
+    await inst.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 260, height: 160 }, formatsToSupport: formats },
+      async (decodedText) => { const text = decodedText; await stop(); onResult(text); },
+      () => {} // เรียกบ่อยตอนยังหาบาร์โค้ดไม่เจอ — เงียบไว้
+    );
+  } catch (e) {
+    $('#scanErr').textContent = 'เปิดกล้องไม่สำเร็จ — ตรวจสอบสิทธิ์การใช้กล้อง (' + (e.message || e) + ')';
+  }
+}
 
 // ---------- auto-login ถ้ามี session ----------
 (async () => { try { ME = await api('/me'); await boot(); } catch { /* แสดงหน้า login */ } })();
