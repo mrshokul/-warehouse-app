@@ -72,8 +72,8 @@ const VIEWS = [
   { key: 'dashboard', label: 'สต็อกปัจจุบัน', min: 'intern' },
   { key: 'movement', label: 'สร้างรายการ', min: 'angel' },
   { key: 'pending', label: 'รออนุมัติ', min: 'angel' },
-  { key: 'reports', label: 'รายงานย้อนหลัง', min: 'intern' },
-  { key: 'products', label: 'สินค้า', min: 'intern' },
+  { key: 'reports', label: 'รายงานย้อนหลัง', min: 'guardian' },
+  { key: 'products', label: 'สินค้า', min: 'guardian' },
   { key: 'admin', label: 'จัดการผู้ใช้', min: 'god' },
 ];
 function buildNav() {
@@ -85,6 +85,8 @@ function buildNav() {
   });
 }
 function go(key) {
+  const v = VIEWS.find(x => x.key === key);
+  if (!v || !can(v.min)) key = 'dashboard';
   document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.k === key));
   ({ dashboard: viewDashboard, movement: viewMovement, pending: viewPending,
      reports: viewReports, products: viewProducts, admin: viewAdmin }[key])();
@@ -409,7 +411,22 @@ async function viewAdmin() {
   const active = users.filter(u => u.approved);
   const RL = { intern: 'มนุษย์ฝึกหัด', angel: 'นางฟ้า', guardian: 'เทพพิทักษ์', god: 'เทพเจ้าสูงสุด' };
   const roleOpts = (sel) => Object.entries(RL).map(([k, v]) => `<option value="${k}"${k === sel ? ' selected' : ''}>${v}</option>`).join('');
-  c.innerHTML = `${pending.length ? `<div class="panel">
+  const appUrl = location.origin + '/';
+  c.innerHTML = `<div class="panel">
+    <h2>QR สำหรับเข้าใช้งานแอป</h2>
+    <p class="desc">ให้พนักงานสแกนด้วยกล้องมือถือเพื่อเปิดหน้าเข้าสู่ระบบ (ต้องสมัครและรออนุมัติก่อนใช้งานได้)</p>
+    <div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap">
+      <img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(appUrl)}" alt="QR เข้าใช้งานแอป" width="180" height="180" style="border:1px solid var(--line);border-radius:14px">
+      <div>
+        <p class="muted" style="font-size:13px;margin-bottom:8px">หรือคัดลอกลิงก์:</p>
+        <div style="display:flex;gap:8px">
+          <input id="appUrlBox" readonly value="${esc(appUrl)}" style="max-width:280px">
+          <button class="btn-ghost btn-sm" id="copyAppUrl">คัดลอก</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  ${pending.length ? `<div class="panel">
     <h2>คำขอสมัครเข้าใช้งาน <span class="muted" style="font-size:14px">(${pending.length})</span></h2>
     <p class="desc">ผู้สมัครใหม่ — เลือกบทบาทแล้วกดอนุมัติ หรือปฏิเสธคำขอ</p>
     <div class="table-wrap"><table><thead><tr><th>ชื่อ-นามสกุล</th><th>ชื่อผู้ใช้</th><th>กำหนดบทบาท</th><th></th></tr></thead><tbody>
@@ -434,6 +451,10 @@ async function viewAdmin() {
         ${u.id !== ME.id ? `<button class="btn-ghost btn-sm" data-tog="${u.id}" data-a="${u.active}">${u.active ? 'ระงับ' : 'เปิดใช้'}</button>` : '<span class="muted" style="font-size:12px">(คุณ)</span>'}
       </td></tr>`).join('')}
     </tbody></table></div></div>`;
+  $('#copyAppUrl').onclick = () => {
+    $('#appUrlBox').select();
+    navigator.clipboard?.writeText(appUrl).then(() => toast('คัดลอกแล้ว')).catch(() => toast('คัดลอกไม่สำเร็จ — เลือกข้อความแล้วกด Ctrl+C เอง', 'bad'));
+  };
   c.querySelectorAll('[data-tog]').forEach(b => b.onclick = async () => {
     await api('/users/' + b.dataset.tog, { method: 'PATCH', body: { active: b.dataset.a !== '1' } });
     toast('อัปเดตแล้ว'); viewAdmin();

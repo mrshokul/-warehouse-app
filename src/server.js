@@ -236,8 +236,8 @@ app.post('/api/movements/:id/cancel', requireAuth, requireRank('angel'), h(async
   res.json({ ok: true });
 }));
 
-// ประวัติ/รายงาน: กรองตามสินค้า / ผู้ทำ / ช่อง
-app.get('/api/movements', requireAuth, h(async (req, res) => {
+// ประวัติ/รายงาน: กรองตามสินค้า / ผู้ทำ / ช่อง (เทพพิทักษ์ขึ้นไป)
+app.get('/api/movements', requireAuth, requireRank('guardian'), h(async (req, res) => {
   const { product_id, user_id, cell } = req.query;
   const where = [], args = [];
   if (product_id) { args.push(+product_id); where.push(`m.product_id=$${args.length}`); }
