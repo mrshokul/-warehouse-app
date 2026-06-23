@@ -102,6 +102,9 @@ async function init() {
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
   );
   CREATE INDEX IF NOT EXISTS idx_products_name ON products(name);
+  -- บาร์โค้ดสำรอง (สินค้าบางตัวมี 2 บาร์โค้ด) — ค้นหา/สแกนแล้วหาไม่เจอจากรหัสหลักให้ลองอันนี้
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS barcode2 TEXT;
+  CREATE INDEX IF NOT EXISTS idx_products_barcode2 ON products(barcode2);
 
   -- ยอดคงเหลือต่อช่อง (หลายต่อหลาย: หนึ่งช่องหลายสินค้า, หนึ่งสินค้าหลายช่อง)
   CREATE TABLE IF NOT EXISTS stock_by_cell (

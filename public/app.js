@@ -142,14 +142,18 @@ async function viewMovement() {
         <div id="mvProdList"></div>
         <div id="mvProdChosen" class="muted" style="margin-top:6px"></div>
       </div>
-      <div><label class="lbl">จำนวน</label><input id="mvQty" type="number" min="1" placeholder="0"></div>
     </div>
     <div class="row" style="margin-top:12px">
       <div id="fromWrap"><label class="lbl">ช่องต้นทาง</label><select id="mvFrom"></select>
         <div id="fromHint" class="muted" style="font-size:12px;margin-top:4px"></div></div>
       <div id="toWrap"><label class="lbl">ช่องปลายทาง</label><select id="mvTo"></select></div>
     </div>
-    <div class="row" style="margin-top:12px"><div><label class="lbl">หมายเหตุ (ถ้ามี)</label><input id="mvNote" placeholder="เช่น เบิกไปสาขา 2"></div></div>
+    <div style="margin-top:16px">
+      <label class="lbl">จำนวน (ถ้าสินค้ามีหลายแบบ เช่น สี/ไซส์ ต่างกัน — เพิ่มได้หลายแถว)</label>
+      <div id="mvLines"></div>
+      <button type="button" class="btn-ghost btn-sm" id="mvAddLine" style="margin-top:8px">+ เพิ่มรายละเอียด (สี/ไซส์/อื่นๆ)</button>
+    </div>
+    <div class="row" style="margin-top:14px"><div><label class="lbl">หมายเหตุรวม (ถ้ามี)</label><input id="mvNote" placeholder="เช่น เบิกไปสาขา 2"></div></div>
     <div style="margin-top:16px;max-width:260px"><button class="btn btn-primary" id="mvSubmit">บันทึกรายการ (รอยืนยัน)</button></div>
     <p class="err" id="mvErr"></p>
   </div>`;
@@ -193,7 +197,7 @@ async function viewMovement() {
   $('#mvProdSearch').addEventListener('input', debounce(doSearchProd, 250));
   $('#mvScanBtn').onclick = () => openScanner(async (code) => {
     const { items } = await api('/products?q=' + encodeURIComponent(code) + '&limit=5');
-    const exact = items.find(p => p.code === code);
+    const exact = items.find(p => p.code === code || p.barcode2 === code);
     if (exact) {
       chosen = exact;
       $('#mvProdChosen').innerHTML = `เลือก: <b style="color:var(--ink)">${esc(chosen.name)}</b> (${esc(chosen.code)})`;
@@ -207,16 +211,40 @@ async function viewMovement() {
     }
   });
 
+  // ---------- รายละเอียด/จำนวน (รองรับหลายแบบ เช่น สี/ไซส์ ในการบันทึกครั้งเดียว) ----------
+  function addLine(detail = '', qty = '') {
+    const row = el(`<div class="row" style="margin-top:8px;align-items:flex-end">
+      <div style="flex:2"><input class="mvDetail" placeholder="รายละเอียด (ถ้ามี) เช่น สีแดง ไซส์ M" value="${esc(detail)}"></div>
+      <div style="flex:0 0 120px"><input class="mvLineQty" type="number" min="1" placeholder="จำนวน" value="${esc(qty)}"></div>
+      <div style="flex:0 0 auto"><button type="button" class="btn-ghost btn-sm" data-remove-line>ลบ</button></div>
+    </div>`);
+    row.querySelector('[data-remove-line]').onclick = () => {
+      if ($('#mvLines').children.length > 1) row.remove();
+    };
+    $('#mvLines').appendChild(row);
+  }
+  addLine();
+  $('#mvAddLine').onclick = () => addLine();
+
   $('#mvSubmit').onclick = async () => {
     $('#mvErr').textContent = '';
     if (!chosen) { $('#mvErr').textContent = 'กรุณาเลือกสินค้า'; return; }
-    const body = {
-      type: $('#mvType').value, product_id: chosen.id, qty: +$('#mvQty').value,
-      from_cell: $('#mvFrom').value || null, to_cell: $('#mvTo').value || null, note: $('#mvNote').value,
-    };
+    const lines = [...$('#mvLines').children].map(row => ({
+      detail: row.querySelector('.mvDetail').value.trim(),
+      qty: +row.querySelector('.mvLineQty').value,
+    }));
+    const valid = lines.filter(l => l.qty > 0);
+    if (!valid.length) { $('#mvErr').textContent = 'กรุณาระบุจำนวน (มากกว่า 0) อย่างน้อย 1 แถว'; return; }
+    const generalNote = $('#mvNote').value.trim();
     try {
-      await api('/movements', { method: 'POST', body });
-      toast('บันทึกแล้ว — รอคนอื่นยืนยัน');
+      for (const l of valid) {
+        const note = [l.detail, generalNote].filter(Boolean).join(' · ');
+        await api('/movements', { method: 'POST', body: {
+          type: $('#mvType').value, product_id: chosen.id, qty: l.qty,
+          from_cell: $('#mvFrom').value || null, to_cell: $('#mvTo').value || null, note,
+        } });
+      }
+      toast(valid.length > 1 ? `บันทึก ${valid.length} รายการแล้ว — รอคนอื่นยืนยัน` : 'บันทึกแล้ว — รอคนอื่นยืนยัน');
       chosen = null; viewMovement();
     } catch (e) { $('#mvErr').textContent = e.message; }
   };

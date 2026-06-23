@@ -109,12 +109,13 @@ app.get('/api/products', requireAuth, h(async (req, res) => {
   let rows;
   if (q) {
     rows = await db.all(
-      `SELECT id, code, name, unit, is_custom FROM products
-       WHERE is_deleted=false AND (code ILIKE $1 OR name ILIKE $1) ORDER BY name LIMIT $2`,
-      [`%${q}%`, limit]
+      `SELECT id, code, name, unit, is_custom, barcode2 FROM products
+       WHERE is_deleted=false AND (code ILIKE $1 OR barcode2 ILIKE $1 OR name ILIKE $1)
+       ORDER BY (code = $3 OR barcode2 = $3) DESC, name LIMIT $2`,
+      [`%${q}%`, limit, q]
     );
   } else {
-    rows = await db.all('SELECT id, code, name, unit, is_custom FROM products WHERE is_deleted=false ORDER BY name LIMIT $1', [limit]);
+    rows = await db.all('SELECT id, code, name, unit, is_custom, barcode2 FROM products WHERE is_deleted=false ORDER BY name LIMIT $1', [limit]);
   }
   const total = (await db.get('SELECT COUNT(*) c FROM products WHERE is_deleted=false')).c;
   res.json({ total: +total, items: rows });
