@@ -76,14 +76,23 @@ const VIEWS = [
   { key: 'products', label: 'สินค้า', min: 'guardian' },
   { key: 'admin', label: 'จัดการผู้ใช้', min: 'god' },
 ];
+function closeNav() {
+  $('#nav').classList.remove('open');
+  $('#navBackdrop').classList.remove('show');
+}
 function buildNav() {
   const nav = $('#nav'); nav.innerHTML = '';
   VIEWS.filter(v => can(v.min)).forEach(v => {
     const a = el(`<div class="nav-item" data-k="${v.key}">${v.label}</div>`);
-    a.onclick = () => go(v.key);
+    a.onclick = () => { go(v.key); closeNav(); };
     nav.appendChild(a);
   });
 }
+$('#navToggle').addEventListener('click', () => {
+  $('#nav').classList.toggle('open');
+  $('#navBackdrop').classList.toggle('show');
+});
+$('#navBackdrop').addEventListener('click', closeNav);
 function go(key) {
   const v = VIEWS.find(x => x.key === key);
   if (!v || !can(v.min)) key = 'dashboard';
