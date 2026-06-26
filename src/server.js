@@ -153,7 +153,7 @@ app.get('/api/stock', requireAuth, h(async (req, res) => {
     FROM stock_by_cell s JOIN products p ON p.id=s.product_id
     WHERE p.is_deleted=false`;
   const rows = q
-    ? await db.all(base + ' AND (p.code ILIKE $1 OR p.name ILIKE $1) ORDER BY p.name, s.cell_code', [`%${q}%`])
+    ? await db.all(base + ' AND (p.code ILIKE $1 OR p.barcode2 ILIKE $1 OR p.name ILIKE $1) ORDER BY p.name, s.cell_code', [`%${q}%`])
     : await db.all(base + ' ORDER BY p.name, s.cell_code');
   // จัดกลุ่มต่อสินค้า
   const map = new Map();
