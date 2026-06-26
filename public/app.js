@@ -380,11 +380,15 @@ async function viewProducts() {
     <h2>สินค้า</h2>
     <p class="desc">ฐานข้อมูลสินค้าทั้งหมด — รหัส (บาร์โค้ด) ห้ามซ้ำ</p>
     <div class="row">
-      <div><input id="pQ" placeholder="ค้นหารหัส/ชื่อสินค้า"></div>
+      <div style="display:flex;gap:8px;flex:1">
+        <input id="pQ" placeholder="ค้นหารหัส/ชื่อสินค้า" style="flex:1">
+        <button type="button" class="btn btn-sky btn-sm" id="pScanBtn" title="สแกนบาร์โค้ด">📷 สแกน</button>
+      </div>
       ${can('angel') ? '<div style="flex:0"><button class="btn btn-sky btn-sm" id="pAdd" style="margin-bottom:1px">+ เพิ่มสินค้า</button></div>' : ''}
     </div>
     <div id="pBody" style="margin-top:16px"></div>
   </div>`;
+  $('#pScanBtn').onclick = () => openScanner((code) => { $('#pQ').value = code; load(); });
   const load = async () => {
     const { total, items } = await api('/products?q=' + encodeURIComponent($('#pQ').value.trim()));
     $('#pBody').innerHTML = `<p class="muted" style="font-size:13px;margin-bottom:8px">ทั้งหมด ${total.toLocaleString()} รายการ${items.length < total ? ' · แสดง ' + items.length : ''}</p>
