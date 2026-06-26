@@ -107,9 +107,18 @@ async function viewDashboard() {
   c.innerHTML = `<div class="panel">
     <h2>สต็อกปัจจุบัน</h2>
     <p class="desc">ของแต่ละชนิดอยู่ช่องไหน เหลือเท่าไหร่ (รวมทุกช่อง)</p>
-    <div class="row"><div><input id="stockQ" placeholder="ค้นหาด้วยรหัส/บาร์โค้ด หรือชื่อสินค้า"></div></div>
+    <div class="row">
+      <div style="display:flex;gap:8px">
+        <input id="stockQ" placeholder="ค้นหาด้วยรหัส/บาร์โค้ด หรือชื่อสินค้า" style="flex:1">
+        <button type="button" class="btn btn-sky btn-sm" id="stockScanBtn" title="สแกนบาร์โค้ด">📷 สแกน</button>
+      </div>
+    </div>
     <div id="stockBody" style="margin-top:16px"></div>
   </div>`;
+  $('#stockScanBtn').onclick = () => openScanner((code) => {
+    $('#stockQ').value = code;
+    load();
+  });
   const load = async () => {
     const q = $('#stockQ').value.trim();
     const rows = await api('/stock?q=' + encodeURIComponent(q));
@@ -557,6 +566,18 @@ function askEdit(id, oldQty, after) {
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
 
 // ---------- สแกนบาร์โค้ดด้วยกล้อง ----------
+let _beepCtx = null;
+function beep() {
+  try {
+    _beepCtx = _beepCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = _beepCtx, osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.type = 'square'; osc.frequency.value = 1500;
+    gain.gain.setValueAtTime(0.18, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.12);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(); osc.stop(ctx.currentTime + 0.12);
+  } catch (_) { /* เบราว์เซอร์บางตัวอาจบล็อกเสียงถ้ายังไม่มี user gesture — ไม่ critical */ }
+}
 let _scannerLibPromise = null;
 function loadScannerLib() {
   if (window.Html5Qrcode) return Promise.resolve();
@@ -600,7 +621,7 @@ async function openScanner(onResult) {
     await inst.start(
       { facingMode: 'environment' },
       { fps: 10, qrbox: { width: 260, height: 160 }, formatsToSupport: formats },
-      async (decodedText) => { const text = decodedText; await stop(); onResult(text); },
+      async (decodedText) => { const text = decodedText; beep(); await stop(); onResult(text); },
       () => {} // เรียกบ่อยตอนยังหาบาร์โค้ดไม่เจอ — เงียบไว้
     );
   } catch (e) {
