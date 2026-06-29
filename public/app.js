@@ -125,13 +125,41 @@ async function viewDashboard() {
     const body = $('#stockBody');
     if (!rows.length) { body.innerHTML = `<div class="empty">ยังไม่มีสต็อก — เริ่มจากการนับสต็อกตั้งต้นในเมนู "สร้างรายการ"</div>`; return; }
     body.innerHTML = `<div class="table-wrap"><table><thead><tr><th>สินค้า</th><th>รหัส</th><th>ตำแหน่ง (ช่อง × จำนวน)</th><th class="right">รวม</th></tr></thead><tbody>
-      ${rows.map(r => `<tr>
-        <td>${esc(r.name)}</td>
+      ${rows.map(r => {
+        const hasVariant = r.cells.some(x => x.variant);
+        // รวมจำนวนต่อช่อง (ไม่แยกตัวเลือกย่อย) ไว้แสดงแถวหลักให้อ่านง่าย
+        const byCell = new Map();
+        for (const x of r.cells) byCell.set(x.cell, (byCell.get(x.cell) || 0) + x.qty);
+        return `<tr>
+        <td>${esc(r.name)} ${hasVariant ? `<button type="button" class="btn-ghost btn-sm" data-detail="${r.id}" title="ดูรายละเอียดแยกตัวเลือก">⋮</button>` : ''}</td>
         <td class="muted">${esc(r.code)}</td>
-        <td>${r.cells.map(x => `<span class="pill pill-cell">${esc(x.cell)} · ${x.qty}</span>`).join(' ')}</td>
+        <td>${[...byCell].map(([cell, qty]) => `<span class="pill pill-cell">${esc(cell)} · ${qty}</span>`).join(' ')}</td>
         <td class="right"><b>${r.total}</b> ${esc(r.unit || '')}</td>
-      </tr>`).join('')}
+      </tr>`;
+      }).join('')}
     </tbody></table></div>`;
+    body.querySelectorAll('[data-detail]').forEach(b => b.onclick = () => {
+      const r = rows.find(x => x.id == b.dataset.detail);
+      const byVariant = new Map();
+      for (const x of r.cells) {
+        const key = x.variant || '(ไม่ระบุตัวเลือก)';
+        if (!byVariant.has(key)) byVariant.set(key, []);
+        byVariant.get(key).push(x);
+      }
+      modal(`<h3>${esc(r.name)}</h3>
+        <p class="muted" style="font-size:13px;margin-bottom:10px">แยกตามตัวเลือก (สี/ไซส์/อื่นๆ)</p>
+        <div class="table-wrap"><table><thead><tr><th>ตัวเลือก</th><th>ช่อง × จำนวน</th><th class="right">รวม</th></tr></thead><tbody>
+        ${[...byVariant].map(([variant, cells]) => `<tr>
+          <td>${esc(variant)}</td>
+          <td>${cells.map(c => `<span class="pill pill-cell">${esc(c.cell)} · ${c.qty}</span>`).join(' ')}</td>
+          <td class="right"><b>${cells.reduce((s, c) => s + c.qty, 0)}</b></td>
+        </tr>`).join('')}
+        </tbody></table></div>`,
+        () => true);
+      // โหมดดูอย่างเดียว — ซ่อนปุ่มบันทึก เหลือแค่ปิด
+      document.querySelector('.modal [data-ok]').classList.add('hidden');
+      document.querySelector('.modal [data-x]').textContent = 'ปิด';
+    });
   };
   $('#stockQ').addEventListener('input', debounce(load, 250));
   load();
@@ -194,7 +222,7 @@ async function viewMovement() {
     if (!chosen || $('#fromWrap').style.display === 'none') { $('#fromHint').textContent = ''; return; }
     const st = await api('/stock/product/' + chosen.id);
     $('#fromHint').innerHTML = st.length
-      ? 'มีของในช่อง: ' + st.map(s => `<b>${s.cell_code}</b>=${s.qty}`).join(', ')
+      ? 'มีของในช่อง: ' + st.map(s => `<b>${s.cell_code}</b>${s.variant ? ` (${esc(s.variant)})` : ''}=${s.qty}`).join(', ')
       : 'สินค้านี้ยังไม่มีของในระบบ';
   };
   $('#mvType').onchange = syncFields;
@@ -260,7 +288,7 @@ async function viewMovement() {
       for (const l of valid) {
         const note = [l.detail, generalNote].filter(Boolean).join(' · ');
         await api('/movements', { method: 'POST', body: {
-          type: $('#mvType').value, product_id: chosen.id, qty: l.qty,
+          type: $('#mvType').value, product_id: chosen.id, qty: l.qty, variant: l.detail,
           from_cell: $('#mvFrom').value || null, to_cell: $('#mvTo').value || null, note,
         } });
       }

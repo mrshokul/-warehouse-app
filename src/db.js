@@ -107,12 +107,20 @@ async function init() {
   CREATE INDEX IF NOT EXISTS idx_products_barcode2 ON products(barcode2);
 
   -- ยอดคงเหลือต่อช่อง (หลายต่อหลาย: หนึ่งช่องหลายสินค้า, หนึ่งสินค้าหลายช่อง)
+  -- variant = ตัวเลือกย่อยของสินค้า เช่น สี/ไซส์ ('' = ไม่มีตัวเลือกย่อย เพื่อให้ของเดิมทำงานเหมือนเดิม)
   CREATE TABLE IF NOT EXISTS stock_by_cell (
     product_id  INTEGER NOT NULL REFERENCES products(id),
     cell_code   TEXT NOT NULL REFERENCES cells(code),
     qty         INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (product_id, cell_code)
   );
+  ALTER TABLE stock_by_cell ADD COLUMN IF NOT EXISTS variant TEXT NOT NULL DEFAULT '';
+  DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'stock_by_cell_pkey') THEN
+      ALTER TABLE stock_by_cell DROP CONSTRAINT stock_by_cell_pkey;
+      ALTER TABLE stock_by_cell ADD PRIMARY KEY (product_id, cell_code, variant);
+    END IF;
+  END $$;
 
   -- รายการเคลื่อนไหว (ทุกแถวผ่านกฎสองมือ: คนทำ + คนยืนยัน คนละคน)
   CREATE TABLE IF NOT EXISTS movements (
@@ -132,6 +140,7 @@ async function init() {
     cancelled_at  TIMESTAMPTZ,
     cancel_reason TEXT
   );
+  ALTER TABLE movements ADD COLUMN IF NOT EXISTS variant TEXT NOT NULL DEFAULT '';
   CREATE INDEX IF NOT EXISTS idx_mv_status ON movements(status);
   CREATE INDEX IF NOT EXISTS idx_mv_product ON movements(product_id);
   CREATE INDEX IF NOT EXISTS idx_mv_creator ON movements(created_by);

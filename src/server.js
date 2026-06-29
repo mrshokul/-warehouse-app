@@ -37,25 +37,27 @@ function requireRank(minRole) {
 }
 
 // ---------- stock helper ----------
-async function addStock(client, product_id, cell, delta) {
-  const row = await client.get('SELECT qty FROM stock_by_cell WHERE product_id=$1 AND cell_code=$2', [product_id, cell]);
+// variant = ตัวเลือกย่อย เช่น สี/ไซส์ ('' = ไม่มีตัวเลือกย่อย)
+async function addStock(client, product_id, cell, delta, variant = '') {
+  const row = await client.get('SELECT qty FROM stock_by_cell WHERE product_id=$1 AND cell_code=$2 AND variant=$3', [product_id, cell, variant]);
   const cur = row ? row.qty : 0;
   const next = cur + delta;
-  if (next < 0) throw new Error(`สต็อกในช่อง ${cell} ไม่พอ (มี ${cur}, ต้องการ ${-delta})`);
+  if (next < 0) throw new Error(`สต็อกในช่อง ${cell}${variant ? ' (' + variant + ')' : ''} ไม่พอ (มี ${cur}, ต้องการ ${-delta})`);
   if (row) {
-    if (next === 0) await client.run('DELETE FROM stock_by_cell WHERE product_id=$1 AND cell_code=$2', [product_id, cell]);
-    else await client.run('UPDATE stock_by_cell SET qty=$1 WHERE product_id=$2 AND cell_code=$3', [next, product_id, cell]);
+    if (next === 0) await client.run('DELETE FROM stock_by_cell WHERE product_id=$1 AND cell_code=$2 AND variant=$3', [product_id, cell, variant]);
+    else await client.run('UPDATE stock_by_cell SET qty=$1 WHERE product_id=$2 AND cell_code=$3 AND variant=$4', [next, product_id, cell, variant]);
   } else {
-    await client.run('INSERT INTO stock_by_cell (product_id, cell_code, qty) VALUES ($1, $2, $3)', [product_id, cell, delta]);
+    await client.run('INSERT INTO stock_by_cell (product_id, cell_code, variant, qty) VALUES ($1, $2, $3, $4)', [product_id, cell, variant, delta]);
   }
 }
 // ใช้ stock change ตามชนิดรายการ (sign=+1 ยืนยัน, -1 ย้อนกลับ)
 async function applyMovementStock(client, m, sign = 1) {
-  if (m.type === 'import' || m.type === 'initial') await addStock(client, m.product_id, m.to_cell, sign * m.qty);
-  else if (m.type === 'withdraw') await addStock(client, m.product_id, m.from_cell, -sign * m.qty);
+  const variant = m.variant || '';
+  if (m.type === 'import' || m.type === 'initial') await addStock(client, m.product_id, m.to_cell, sign * m.qty, variant);
+  else if (m.type === 'withdraw') await addStock(client, m.product_id, m.from_cell, -sign * m.qty, variant);
   else if (m.type === 'move') {
-    await addStock(client, m.product_id, m.from_cell, -sign * m.qty);
-    await addStock(client, m.product_id, m.to_cell, sign * m.qty);
+    await addStock(client, m.product_id, m.from_cell, -sign * m.qty, variant);
+    await addStock(client, m.product_id, m.to_cell, sign * m.qty, variant);
   }
 }
 
@@ -149,32 +151,32 @@ app.get('/api/stock', requireAuth, h(async (req, res) => {
   const q = (req.query.q || '').trim();
   const base = `
     SELECT p.id, p.code, p.name, p.unit,
-           s.cell_code, s.qty
+           s.cell_code, s.qty, s.variant
     FROM stock_by_cell s JOIN products p ON p.id=s.product_id
     WHERE p.is_deleted=false`;
   const rows = q
-    ? await db.all(base + ' AND (p.code ILIKE $1 OR p.barcode2 ILIKE $1 OR p.name ILIKE $1) ORDER BY p.name, s.cell_code', [`%${q}%`])
-    : await db.all(base + ' ORDER BY p.name, s.cell_code');
+    ? await db.all(base + ' AND (p.code ILIKE $1 OR p.barcode2 ILIKE $1 OR p.name ILIKE $1) ORDER BY p.name, s.cell_code, s.variant', [`%${q}%`])
+    : await db.all(base + ' ORDER BY p.name, s.cell_code, s.variant');
   // จัดกลุ่มต่อสินค้า
   const map = new Map();
   for (const r of rows) {
     if (!map.has(r.id)) map.set(r.id, { id: r.id, code: r.code, name: r.name, unit: r.unit, total: 0, cells: [] });
     const o = map.get(r.id);
     o.total += r.qty;
-    o.cells.push({ cell: r.cell_code, qty: r.qty });
+    o.cells.push({ cell: r.cell_code, qty: r.qty, variant: r.variant || '' });
   }
   res.json([...map.values()]);
 }));
 
-// ยอดของสินค้าหนึ่งตัว (ไว้เลือกช่องตอนเบิก)
+// ยอดของสินค้าหนึ่งตัว (ไว้เลือกช่อง/ตัวเลือกย่อยตอนเบิก)
 app.get('/api/stock/product/:id', requireAuth, h(async (req, res) => {
-  res.json(await db.all('SELECT cell_code, qty FROM stock_by_cell WHERE product_id=$1 ORDER BY cell_code', [+req.params.id]));
+  res.json(await db.all('SELECT cell_code, qty, variant FROM stock_by_cell WHERE product_id=$1 ORDER BY cell_code, variant', [+req.params.id]));
 }));
 
 // ===================== MOVEMENTS =====================
 // สร้างรายการ (นางฟ้าขึ้นไป) -> สถานะ pending, ยังไม่กระทบสต็อก
 app.post('/api/movements', requireAuth, requireRank('angel'), h(async (req, res) => {
-  const { type, product_id, qty, from_cell, to_cell, note } = req.body;
+  const { type, product_id, qty, from_cell, to_cell, note, variant } = req.body;
   if (!['import', 'withdraw', 'move', 'initial'].includes(type))
     return res.status(400).json({ error: 'ประเภทรายการไม่ถูกต้อง' });
   if (!product_id || !qty || qty <= 0)
@@ -187,9 +189,9 @@ app.post('/api/movements', requireAuth, requireRank('angel'), h(async (req, res)
     return res.status(400).json({ error: 'ต้องระบุช่องต้นทางและปลายทาง' });
 
   const info = await db.get(
-    `INSERT INTO movements (type, product_id, qty, from_cell, to_cell, note, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-    [type, product_id, qty, from_cell || null, to_cell || null, (note || '').trim() || null, req.user.id]
+    `INSERT INTO movements (type, product_id, qty, from_cell, to_cell, note, variant, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+    [type, product_id, qty, from_cell || null, to_cell || null, (note || '').trim() || null, (variant || '').trim(), req.user.id]
   );
   res.json({ id: info.id });
 }));
