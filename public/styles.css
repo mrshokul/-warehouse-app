@@ -124,6 +124,26 @@ tr:hover td{background:rgba(43,168,224,.05)}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .toast.ok{background:var(--green)}.toast.bad{background:var(--red)}
 
+/* ---------- pending notification popup ---------- */
+.pending-noti{position:fixed;bottom:28px;right:24px;z-index:200;display:flex;align-items:center;gap:12px;
+  background:#fff;border-radius:18px;padding:14px 16px;box-shadow:0 12px 40px -10px rgba(30,127,181,.35),0 0 0 1.5px rgba(43,182,115,.25);
+  max-width:340px;transform:translateY(20px) scale(.96);opacity:0;pointer-events:none;
+  transition:transform .3s cubic-bezier(.2,.8,.2,1),opacity .3s}
+.pending-noti.show{transform:none;opacity:1;pointer-events:auto}
+.pn-icon{font-size:28px;flex:0 0 auto;animation:ring .8s .4s ease both}
+@keyframes ring{0%,100%{transform:rotate(0)}20%{transform:rotate(-18deg)}40%{transform:rotate(18deg)}60%{transform:rotate(-10deg)}80%{transform:rotate(10deg)}}
+.pn-body{flex:1;min-width:0}
+.pn-title{font-family:'Mitr';font-weight:600;font-size:15px;color:var(--ink)}
+.pn-sub{font-size:13px;color:var(--muted);margin-top:2px}
+.pn-count{color:var(--green);font-weight:700}
+.pn-go{flex:0 0 auto;white-space:nowrap}
+.pn-close{flex:0 0 auto;background:transparent;border:none;cursor:pointer;font-size:15px;color:var(--muted);padding:4px 6px;border-radius:6px;line-height:1;transition:.15s}
+.pn-close:hover{background:var(--bg);color:var(--ink)}
+
+@media(max-width:640px){
+  .pending-noti{bottom:16px;right:12px;left:12px;max-width:none;border-radius:14px}
+}
+
 @media(max-width:640px){
   body{font-size:15px}
   .login-wrap{padding:14px}

@@ -65,6 +65,7 @@ async function boot() {
   $('#whoRole').textContent = ME.role_th;
   buildNav();
   go('dashboard');
+  setTimeout(checkPendingAlert, 800);
 }
 
 // ---------- NAV ----------
@@ -659,6 +660,39 @@ async function openScanner(onResult) {
   } catch (e) {
     $('#scanErr').textContent = 'เปิดกล้องไม่สำเร็จ — ตรวจสอบสิทธิ์การใช้กล้อง (' + (e.message || e) + ')';
   }
+}
+
+// ---------- แจ้งเตือน popup รออนุมัติ ----------
+let _pendingNotiEl = null;
+async function checkPendingAlert() {
+  if (!can('angel')) return;
+  try {
+    const mv = await api('/movements/pending');
+    const canConfirm = mv.filter(m => m.created_by !== ME.id);
+    if (!canConfirm.length) { hidePendingAlert(); return; }
+    showPendingAlert(canConfirm.length);
+  } catch (_) {}
+}
+function showPendingAlert(count) {
+  if (_pendingNotiEl) { _pendingNotiEl.querySelector('.pn-count').textContent = count; return; }
+  _pendingNotiEl = el(`<div class="pending-noti" id="pendingNoti">
+    <div class="pn-icon">🔔</div>
+    <div class="pn-body">
+      <div class="pn-title">มีรายการรออนุมัติ</div>
+      <div class="pn-sub"><span class="pn-count">${count}</span> รายการรอการยืนยันจากคุณ</div>
+    </div>
+    <button class="btn btn-green btn-sm pn-go">ดูเลย</button>
+    <button class="pn-close" title="ปิด">✕</button>
+  </div>`);
+  document.body.appendChild(_pendingNotiEl);
+  setTimeout(() => _pendingNotiEl && _pendingNotiEl.classList.add('show'), 50);
+  _pendingNotiEl.querySelector('.pn-go').onclick = () => { hidePendingAlert(); go('pending'); };
+  _pendingNotiEl.querySelector('.pn-close').onclick = hidePendingAlert;
+}
+function hidePendingAlert() {
+  if (!_pendingNotiEl) return;
+  _pendingNotiEl.classList.remove('show');
+  setTimeout(() => { if (_pendingNotiEl) { _pendingNotiEl.remove(); _pendingNotiEl = null; } }, 300);
 }
 
 // ---------- auto-login ถ้ามี session ----------
