@@ -208,6 +208,7 @@ async function viewMovement() {
   </div>`;
 
   let chosen = null;
+  let stockVariants = []; // ตัวเลือก (สี/ไซส์) ที่มีของอยู่จริง สำหรับสินค้าที่เลือก
   const cellOpts = (sel) => `<option value="">— เลือกช่อง —</option>` +
     CELLS.map(x => `<option value="${x.code}"${x.code === sel ? ' selected' : ''}>${x.code} (โซน ${x.zone})</option>`).join('');
   $('#mvTo').innerHTML = cellOpts();
@@ -218,13 +219,41 @@ async function viewMovement() {
     $('#fromWrap').style.display = (t === 'withdraw' || t === 'move') ? '' : 'none';
     $('#toWrap').style.display = (t === 'import' || t === 'move' || t === 'initial') ? '' : 'none';
     refreshFromHint();
+    refreshLineVariants();
   };
   const refreshFromHint = async () => {
-    if (!chosen || $('#fromWrap').style.display === 'none') { $('#fromHint').textContent = ''; return; }
+    if (!chosen) { $('#fromHint').textContent = ''; stockVariants = []; refreshLineVariants(); return; }
     const st = await api('/stock/product/' + chosen.id);
+    // เก็บตัวเลือกที่มีของจริง (ไม่ซ้ำ) ไว้ให้เลือกตอนเบิก/ย้าย
+    stockVariants = [...new Set(st.filter(s => s.variant && s.qty > 0).map(s => s.variant))];
+    refreshLineVariants();
+    if ($('#fromWrap').style.display === 'none') { $('#fromHint').textContent = ''; return; }
     $('#fromHint').innerHTML = st.length
       ? 'มีของในช่อง: ' + st.map(s => `<b>${s.cell_code}</b>${s.variant ? ` (${esc(s.variant)})` : ''}=${s.qty}`).join(', ')
       : 'สินค้านี้ยังไม่มีของในระบบ';
+  };
+  // เมื่อเป็นการเบิก/ย้าย และสินค้ามีตัวเลือกอยู่จริง — เปลี่ยนช่องรายละเอียดเป็น dropdown ให้เลือก
+  const refreshLineVariants = () => {
+    const t = $('#mvType').value;
+    const usePicker = (t === 'withdraw' || t === 'move') && stockVariants.length > 0;
+    [...$('#mvLines').children].forEach(row => {
+      const cur = row.querySelector('.mvDetail');
+      if (!cur) return;
+      const val = cur.value;
+      if (usePicker && cur.tagName !== 'SELECT') {
+        const sel = el(`<select class="mvDetail">
+          <option value="">— เลือกตัวเลือก (สี/ไซส์) —</option>
+          ${stockVariants.map(v => `<option value="${esc(v)}"${v === val ? ' selected' : ''}>${esc(v)}</option>`).join('')}
+        </select>`);
+        cur.replaceWith(sel);
+      } else if (usePicker && cur.tagName === 'SELECT') {
+        cur.innerHTML = `<option value="">— เลือกตัวเลือก (สี/ไซส์) —</option>` +
+          stockVariants.map(v => `<option value="${esc(v)}"${v === val ? ' selected' : ''}>${esc(v)}</option>`).join('');
+      } else if (!usePicker && cur.tagName === 'SELECT') {
+        const inp = el(`<input class="mvDetail" placeholder="รายละเอียด (ถ้ามี) เช่น สีแดง ไซส์ M" value="${esc(val)}">`);
+        cur.replaceWith(inp);
+      }
+    });
   };
   $('#mvType').onchange = syncFields;
 
@@ -271,6 +300,7 @@ async function viewMovement() {
       if ($('#mvLines').children.length > 1) row.remove();
     };
     $('#mvLines').appendChild(row);
+    refreshLineVariants();
   }
   addLine();
   $('#mvAddLine').onclick = () => addLine();
