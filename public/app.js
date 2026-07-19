@@ -132,7 +132,7 @@ async function viewDashboard() {
         const byCell = new Map();
         for (const x of r.cells) byCell.set(x.cell, (byCell.get(x.cell) || 0) + x.qty);
         return `<tr>
-        <td>${esc(r.name)} ${hasVariant ? `<button type="button" class="btn-ghost btn-sm" data-detail="${r.id}" title="ดูรายละเอียดแยกตัวเลือก">⋮</button>` : ''}</td>
+        <td>${esc(r.name)} ${hasVariant ? `<button type="button" class="btn-ghost btn-sm" data-detail="${r.id}" title="ดูรายละเอียดแยกตัวเลือก">⋮</button>` : ''}${can('angel') ? `<button type="button" class="btn-ghost btn-sm" data-manage="${r.id}" title="ปรับ/ล้างสต็อก">⚙️ จัดการ</button>` : ''}</td>
         <td class="muted">${esc(r.code)}</td>
         <td>${[...byCell].map(([cell, qty]) => `<span class="pill pill-cell">${esc(cell)} · ${qty}</span>`).join(' ')}</td>
         <td class="right"><b>${r.total}</b> ${esc(r.unit || '')}</td>
@@ -161,7 +161,56 @@ async function viewDashboard() {
       document.querySelector('.modal [data-ok]').classList.add('hidden');
       document.querySelector('.modal [data-x]').textContent = 'ปิด';
     });
+    body.querySelectorAll('[data-manage]').forEach(b => b.onclick = () => openManage(rows.find(x => x.id == b.dataset.manage)));
   };
+  // ---------- จัดการสต็อก (ปรับจำนวน/ล้างช่อง) ผ่านระบบรายการ (ต้องมีคนที่สองยืนยัน) ----------
+  function openManage(r) {
+    const lines = r.cells.map((c, i) => ({ ...c, idx: i }));
+    modal(`<h3>จัดการสต็อก</h3>
+      <p class="muted" style="font-size:13px;margin-bottom:4px"><b style="color:var(--ink)">${esc(r.name)}</b> <span>(${esc(r.code)})</span></p>
+      <p class="muted" style="font-size:12.5px;margin-bottom:12px">แก้จำนวนแต่ละช่อง/ตัวเลือก แล้วกดบันทึก — ระบบจะสร้าง "รายการปรับ" ที่ต้องให้คนอื่นยืนยันก่อนมีผลจริง (เก็บประวัติทุกครั้ง)</p>
+      <div class="table-wrap"><table><thead><tr><th>ช่อง</th><th>ตัวเลือก</th><th class="right">คงเหลือ</th><th>ปรับเป็น</th><th></th></tr></thead><tbody>
+      ${lines.map(c => `<tr>
+        <td><span class="pill pill-cell">${esc(c.cell)}</span></td>
+        <td>${c.variant ? esc(c.variant) : '<span class="muted">—</span>'}</td>
+        <td class="right">${c.qty}</td>
+        <td><input type="number" min="0" class="mgQty" data-idx="${c.idx}" value="${c.qty}" style="width:88px"></td>
+        <td class="right"><button type="button" class="btn-ghost btn-sm" data-clear="${c.idx}">ล้าง</button></td>
+      </tr>`).join('')}
+      </tbody></table></div>
+      <p class="muted" style="font-size:12px;margin-top:10px">ต้องการเพิ่มช่อง/สีใหม่ที่ยังไม่มีในตาราง — ใช้เมนู "สร้างรายการ"</p>
+      <p class="err" id="mgErr"></p>`, async () => {
+        const errEl = $('#mgErr'); errEl.textContent = '';
+        const changes = [];
+        document.querySelectorAll('.modal .mgQty').forEach(inp => {
+          const c = lines[+inp.dataset.idx];
+          const target = Math.floor(+inp.value);
+          if (Number.isNaN(target) || target < 0 || target === c.qty) return;
+          changes.push({ c, target });
+        });
+        if (!changes.length) { errEl.textContent = 'ยังไม่มีการเปลี่ยนแปลง'; return false; }
+        try {
+          for (const { c, target } of changes) {
+            const delta = target - c.qty;
+            if (delta > 0) {
+              await api('/movements', { method: 'POST', body: {
+                type: 'import', product_id: r.id, qty: delta, to_cell: c.cell, variant: c.variant || '',
+                note: `ปรับสต็อก (เพิ่ม ${delta}) จากหน้าสต็อกปัจจุบัน` } });
+            } else {
+              await api('/movements', { method: 'POST', body: {
+                type: 'withdraw', product_id: r.id, qty: -delta, from_cell: c.cell, variant: c.variant || '',
+                note: target === 0 ? 'ล้างช่อง (ปรับเหลือ 0) จากหน้าสต็อกปัจจุบัน' : `ปรับสต็อก (ลด ${-delta}) จากหน้าสต็อกปัจจุบัน` } });
+            }
+          }
+          toast(`สร้างรายการปรับ ${changes.length} รายการ — รอคนอื่นยืนยันในเมนู "รออนุมัติ"`);
+          load(); return true;
+        } catch (e) { errEl.textContent = e.message; return false; }
+      });
+    document.querySelectorAll('.modal [data-clear]').forEach(b => b.onclick = () => {
+      const inp = document.querySelector(`.modal .mgQty[data-idx="${b.dataset.clear}"]`);
+      if (inp) inp.value = 0;
+    });
+  }
   $('#stockQ').addEventListener('input', debounce(load, 250));
   load();
 }
