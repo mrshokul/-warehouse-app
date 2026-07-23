@@ -281,26 +281,33 @@ async function viewMovement() {
       ? 'มีของในช่อง: ' + st.map(s => `<b>${s.cell_code}</b>${s.variant ? ` (${esc(s.variant)})` : ''}=${s.qty}`).join(', ')
       : 'สินค้านี้ยังไม่มีของในระบบ';
   };
-  // เมื่อเป็นการเบิก/ย้าย และสินค้ามีตัวเลือกอยู่จริง — เปลี่ยนช่องรายละเอียดเป็น dropdown ให้เลือก
+  // ปรับช่อง "รายละเอียด" ตามชนิดรายการ + ตัวเลือกที่มีจริง
+  //  - เบิก/ย้าย + สินค้ามีตัวเลือกย่อย  → dropdown เลือกจากของที่มีจริง
+  //  - เบิก/ย้าย + สินค้าไม่มีตัวเลือกย่อย → ซ่อนช่องรายละเอียด (กันพิมพ์ variant ผีจนยืนยันไม่ได้)
+  //  - นำเข้า/นับตั้งต้น → พิมพ์เองได้ (อาจเป็นสีใหม่ที่ยังไม่มีในระบบ)
   const refreshLineVariants = () => {
     const t = $('#mvType').value;
-    const usePicker = (t === 'withdraw' || t === 'move') && stockVariants.length > 0;
+    const isOut = (t === 'withdraw' || t === 'move');
+    const usePicker = isOut && stockVariants.length > 0;
+    const hideDetail = isOut && chosen && stockVariants.length === 0;
     [...$('#mvLines').children].forEach(row => {
-      const cur = row.querySelector('.mvDetail');
-      if (!cur) return;
-      const val = cur.value;
-      if (usePicker && cur.tagName !== 'SELECT') {
-        const sel = el(`<select class="mvDetail">
-          <option value="">— เลือกตัวเลือก (สี/ไซส์) —</option>
-          ${stockVariants.map(v => `<option value="${esc(v)}"${v === val ? ' selected' : ''}>${esc(v)}</option>`).join('')}
-        </select>`);
-        cur.replaceWith(sel);
-      } else if (usePicker && cur.tagName === 'SELECT') {
-        cur.innerHTML = `<option value="">— เลือกตัวเลือก (สี/ไซส์) —</option>` +
+      const wrap = row.querySelector('.mvDetailWrap');
+      if (!wrap) return;
+      const cur = wrap.querySelector('.mvDetail');
+      const val = cur ? cur.value : '';
+      if (hideDetail) {
+        wrap.style.display = 'none';
+        if (cur) cur.value = '';
+      } else if (usePicker) {
+        wrap.style.display = '';
+        const opts = `<option value="">— เลือกตัวเลือก (สี/ไซส์) —</option>` +
           stockVariants.map(v => `<option value="${esc(v)}"${v === val ? ' selected' : ''}>${esc(v)}</option>`).join('');
-      } else if (!usePicker && cur.tagName === 'SELECT') {
-        const inp = el(`<input class="mvDetail" placeholder="รายละเอียด (ถ้ามี) เช่น สีแดง ไซส์ M" value="${esc(val)}">`);
-        cur.replaceWith(inp);
+        if (!cur || cur.tagName !== 'SELECT') wrap.innerHTML = `<select class="mvDetail">${opts}</select>`;
+        else cur.innerHTML = opts;
+      } else {
+        wrap.style.display = '';
+        if (!cur || cur.tagName !== 'INPUT')
+          wrap.innerHTML = `<input class="mvDetail" placeholder="รายละเอียด (ถ้ามี) เช่น สีแดง ไซส์ M" value="${esc(val)}">`;
       }
     });
   };
@@ -341,7 +348,7 @@ async function viewMovement() {
   // ---------- รายละเอียด/จำนวน (รองรับหลายแบบ เช่น สี/ไซส์ ในการบันทึกครั้งเดียว) ----------
   function addLine(detail = '', qty = '') {
     const row = el(`<div class="row" style="margin-top:8px;align-items:flex-end">
-      <div style="flex:2"><input class="mvDetail" placeholder="รายละเอียด (ถ้ามี) เช่น สีแดง ไซส์ M" value="${esc(detail)}"></div>
+      <div class="mvDetailWrap" style="flex:2"><input class="mvDetail" placeholder="รายละเอียด (ถ้ามี) เช่น สีแดง ไซส์ M" value="${esc(detail)}"></div>
       <div style="flex:0 0 120px"><input class="mvLineQty" type="number" min="1" placeholder="จำนวน" value="${esc(qty)}"></div>
       <div style="flex:0 0 auto"><button type="button" class="btn-ghost btn-sm" data-remove-line>ลบ</button></div>
     </div>`);
@@ -363,6 +370,10 @@ async function viewMovement() {
     }));
     const valid = lines.filter(l => l.qty > 0);
     if (!valid.length) { $('#mvErr').textContent = 'กรุณาระบุจำนวน (มากกว่า 0) อย่างน้อย 1 แถว'; return; }
+    const t = $('#mvType').value;
+    if ((t === 'withdraw' || t === 'move') && stockVariants.length > 0 && valid.some(l => !l.detail)) {
+      $('#mvErr').textContent = 'กรุณาเลือกตัวเลือก (สี/ไซส์) ให้ครบทุกแถว'; return;
+    }
     const generalNote = $('#mvNote').value.trim();
     try {
       for (const l of valid) {
